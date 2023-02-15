@@ -1,0 +1,208 @@
+---
+title: "Assignment1_Astraunauts"
+author: "Eunho Cha"
+date: "2023-02-09"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r astraunauts}
+astra <- read.csv("https://raw.githubusercontent.com/QMSS-G5063-2023/course_content/main/Exercises/03_astronauts%20-%20GRADED/astronauts.csv?token=GHSAT0AAAAAAB557SY67DYJGWWUEAM4MRUIY7M3XOA")
+head(astra)
+```
+1. Age & Sex
+
+```{r}
+astra$age_of_selection <- astra$year_of_selection - astra$year_of_birth
+```
+
+```{r}
+library(ggplot2)
+# Scatter plot
+ggplot(astra, aes(x = year_of_birth, y = age_of_selection, color=sex)) +
+  geom_point(alpha=0.5) +
+  labs(x="Year of Birth", y="Age of Selection", color="sex") +
+    theme(legend.position="right") +
+  ggtitle("Age of selection by years of birth: gender difference")
+
+# Few female pilots
+# Female astraunauts began to be selected from 1940's birth cohort
+# Age range differ by gender
+```
+```{r}
+# Box plot (show age distribution for each birth cohort, by gender)
+astra <- within(astra, {
+  birth_cohort <- NA
+  birth_cohort[year_of_birth<1930] <- "Before 1920's"
+  birth_cohort[year_of_birth>=1930 & year_of_birth <1940] <- "1930's"
+  birth_cohort[year_of_birth>=1940 & year_of_birth < 1950] <- "1940's"
+  birth_cohort[year_of_birth>=1950 & year_of_birth < 1960] <- "1950's"
+  birth_cohort[year_of_birth>=1960 & year_of_birth < 1970] <- "1960's"
+  birth_cohort[year_of_birth>=1970 ] <- "1970's and after"
+})
+```
+```{r}
+
+ggplot(astra, aes(x=reorder(birth_cohort, year_of_birth, na.ra=TRUE), y=age_of_selection)) +
+  geom_boxplot(aes(fill=sex), outlier.colour = "transparent",
+               alpha = 0.3) + #<< fill in different colors by "sex" 
+  coord_flip() + labs(x="Year of Birth", y="Age of Selection") +
+    theme(legend.position="right") +
+    ggtitle("Age of selection by birth cohorts: gender difference")
+# Few female pilots
+# Female astraunauts began to be selected not until 1940's birth cohort
+# Age range differ by gender
+```
+```{r}
+
+ggplot(astra, aes(x=reorder(birth_cohort, year_of_birth, na.ra=TRUE), y=age_of_selection)) +
+  geom_jitter(shape=21, aes(fill=sex), color="transparent",
+              position = position_jitter(w=0.1)) +
+  coord_flip() + labs(x="", y="age of selection") +
+    theme(legend.position="right") +
+    ggtitle("Age of selection by years of birth: gender difference")
+
+# Few female pilots
+# Female astraunauts began to be selected from 1940's birth cohort
+# Age range differ by gender
+```
+* The scatter chart and the jitter chart both shows that (1) there are fewer female astranauts, (2) female astranauts took part in the space mission beginning from 1930's birth cohort, and (3) the age range is more restrictive for females.
+
+* I would recommend to use the jitter chart because it shows the gender and age distribution of the astraunauts by birth cohorts more intuitively.
+* I considered the principles of similarities (using consistent color for all male and female) and proximity (used the distance between data points to group/distinguish birth cohorts). I tried to make the graph simple by not adding box plot to the graph since the proximity of data points show the age range.
+
+2. Nationality
+```{r}
+require(dplyr)
+astra <- astra %>%
+  group_by(nationality) %>%
+  mutate(year_of_first_mission = min(year_of_mission))
+
+astra <- astra %>%
+  group_by(mission_title) %>%
+  mutate(joint_mission = as.integer(n_distinct(nationality) > 1))
+
+summarize(astra, id, nationality, year_of_first_mission, mission_title, joint_mission, eva_instances, eva_hrs_mission, total_eva_hrs)
+
+```
+
+```{r}
+ggplot(astra, aes(x = reorder(nationality, -year_of_first_mission), y = year_of_mission, color=joint_mission)) +
+  geom_point(alpha=0.5) +
+  coord_flip() +
+  labs(x="", y="Year of missions", color="joint mission") +
+    theme(legend.position="right") +
+    ggtitle("World-wide history of space missions: astronauts across countries")
+```
+
+* Dot plot is used to map the year of missions for each country in a simple manner. The countries are aligned by the first year of mission to show that countries other than the U.S. or Russia gradually to join the space mission. Also, this graph shows the frequency of the joint mission, the shuttle mission that astranauts with mix of countries participated in. 
+
+3. Space walks
+```{r}
+library(dplyr)
+agg <- astra %>%
+  group_by(name) %>%
+  summarize('num_of_eva'=sum(eva_instances),
+            'total_eva'=sum(total_eva_hrs))
+summarize(agg, name, num_of_eva, total_eva)
+
+library(ggthemes)
+dplot <- ggplot(agg, aes(x=num_of_eva, y=total_eva)) +
+        geom_bar(stat="summary", fill="steelblue")+
+  labs(x="The number of EVA", y="Total hours of EVA")+
+    ggtitle("The relationship between the number of EVA and total hours of EVA")
+dplot
+```
+
+4. Choose my own: trends in hours of space missions over time (1960-2020)
+```{r}
+# Whether the mission lasted over 30 days
+astra$success <- as.numeric(astra$hours_mission > 720)
+head(astra)
+
+astra$yearbin <- cut(astra$year_of_mission,
+                     breaks = c(1910, 1920, 1930, 1940, 1950, 1960, 1970, 1980, 1990, 2000, 2010, 2020),
+                     labels = c('1910s', '1920s', '1930s', '1940s', '1950s', '1960s', '1970s', '1980s', '1990s', '2000s', '2010s'))
+
+bargraph <- ggplot(astra, aes(x=yearbin, y=success, color = sex))+
+  geom_bar(stat = "summary", fun = "mean", fill = "grey", position="dodge") +
+  labs(x="", y="% of mission lasted over 30 days")
+bargraph
+
+missionhrs <- astra %>%
+  group_by(year_of_mission, sex) %>%
+  summarize('avghours_mission'=mean(hours_mission),
+            'minhours_mission'=min(hours_mission), 
+            'maxhours_mission'=max(hours_mission), na.ra=T)
+
+dotlineplot <- ggplot(missionhrs, aes(x=year_of_mission, y=avghours_mission, color = sex))+
+  geom_line() + geom_point(size=3) +
+  labs(x="", y="Average hours of space missions") +
+    ggtitle("Average hours of space missions over time (1960-2020)")
+dotlineplot
+```
+* The bar graph charts how the percentage of missions whose duration lasted over 30 days(700 hours) changed over every decades, by sex of the astranauts who participated in the missions. The dotted line graph also shows the annual trend of average hours of space missions by sex. Both graphs reveals the interesting pattern that 1) the duration of missions increased over time, particularly in the last decade, and 2) the gender difference in the duration of mission disappeared, and even got reversed in 2010's. I recommend the dotted line chart as it represents the overall time trends and changes in gender difference more intuitively.
+
+
+# 5. Interactivity: make two plots interactive
+
+
+```{r}
+library(plotly)
+dotlineplot2 <- ggplot(missionhrs, aes(x=year_of_mission, y=avghours_mission, color = sex, label = minhours_mission))+
+  geom_line() + geom_point(size=3) +
+  labs(x="", y="Average hours of space missions") +
+  ggtitle("Trend in average hourse of space mission")
+ggplotly(dotlineplot2,
+         tooltip = c("year_of_mission", "avghours_mission", "minhours_mission"))
+```
+
+
+```{r}
+boxplot <- plot_ly(astra, y=~age_of_selection, x =~reorder(birth_cohort, year_of_birth), color = ~sex, type = "box")
+m <- list(l = 100, r = 100, b = 100, t = 10, pad = 10) #<<
+boxplot <- boxplot %>% layout(autosize = F, width = 900, height = 400,
+                              boxmode="group", 
+                              margin = m,
+                              yaxis = list(title = "Age of Selection", showticklabels =T),
+                              xaxis = list(title = "Birth cohort"),
+                              title = 'Age of selection by birth cohorts'
+                              )  
+boxplot
+
+```
+# 6. Data Table
+
+```{r}
+astronaut <- astra %>%
+  group_by(name) %>%
+  summarize('total_number_of_missions'=max(total_number_of_missions),
+            'total_hours_mission'=max(total_hrs_sum),
+            'total_eva_hrs'=max(total_eva_hrs))
+
+library("DT")
+# Fixing Column Labels
+
+library(stringr)
+pretty_headers <- 
+  gsub("[.]", " ", colnames(astronaut)) %>%
+  str_to_title()
+
+# Adding Selection Fields and Sliders
+astronaut %>%
+  datatable(
+    rownames = FALSE,
+    colnames = pretty_headers,
+    filter = list(position = "top"),
+    options = list(
+      dom = "Bfrtip",
+      buttons = I("colvis"),
+      language = list(sSearch = "Filter:")
+    ),
+    extensions = c("Buttons", "Responsive")
+  )
+```
+* I want to highlight the key achievements of each astronauts: total number of missions, total hours of mission, and total EVA hours. Each record represents different aspects of achiments as an astronaut. The number of missions show the activity, total hours of mission shows the time spent in space, and total EVA hours marks the quality of the missions.
